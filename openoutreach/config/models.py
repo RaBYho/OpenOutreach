@@ -150,4 +150,21 @@ class SiteConfig(models.Model):
                     environment[variable] = "true" if value else "false"
                 elif str(value).strip():
                     environment[variable] = str(value).strip()
+
+        # If using Ollama, ensure model format and fallback base/key are compatible with children
+        if self.ai_model.startswith("ollama:"):
+            model_name = self.ai_model[len("ollama:"):]
+            environment["OPENOUTFIND_AI_MODEL"] = f"openai_compatible:{model_name}"
+            environment["OUTSEND_AI_MODEL"] = f"openai_compatible:{model_name}"
+            if not self.llm_api_base.strip():
+                environment.setdefault("OPENOUTFIND_LLM_API_BASE", "http://localhost:11434/v1")
+                environment.setdefault("OUTSEND_LLM_API_BASE", "http://localhost:11434/v1")
+            if not self.llm_api_key.strip():
+                environment.setdefault("OPENOUTFIND_LLM_API_KEY", "ollama")
+                environment.setdefault("OUTSEND_LLM_API_KEY", "ollama")
+        elif self.ai_model.startswith("openai_compatible:"):
+            if not self.llm_api_key.strip():
+                environment.setdefault("OPENOUTFIND_LLM_API_KEY", "ollama")
+                environment.setdefault("OUTSEND_LLM_API_KEY", "ollama")
+
         return environment

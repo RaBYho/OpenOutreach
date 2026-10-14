@@ -77,6 +77,32 @@ class TestTheExport:
     def test_no_legal_notice_flag_is_exported(self, configured):
         assert "OPENOUTFIND_ACCEPT_LEGAL_NOTICE" not in configured.export()
 
+    def test_ollama_model_exports_as_openai_compatible_with_cloud_settings(self, configured):
+        configured.ai_model = "ollama:gemma4:31b"
+        configured.llm_api_base = "https://ollama.my-cloud.com/v1"
+        configured.llm_api_key = "secret-token"
+
+        environment = configured.export()
+        assert environment["OPENOUTFIND_AI_MODEL"] == "openai_compatible:gemma4:31b"
+        assert environment["OUTSEND_AI_MODEL"] == "openai_compatible:gemma4:31b"
+        assert environment["OPENOUTFIND_LLM_API_BASE"] == "https://ollama.my-cloud.com/v1"
+        assert environment["OUTSEND_LLM_API_BASE"] == "https://ollama.my-cloud.com/v1"
+        assert environment["OPENOUTFIND_LLM_API_KEY"] == "secret-token"
+        assert environment["OUTSEND_LLM_API_KEY"] == "secret-token"
+
+    def test_ollama_model_defaults_base_and_key_when_empty(self, configured):
+        configured.ai_model = "ollama:llama3.3"
+        configured.llm_api_base = ""
+        configured.llm_api_key = ""
+
+        environment = configured.export()
+        assert environment["OPENOUTFIND_AI_MODEL"] == "openai_compatible:llama3.3"
+        assert environment["OUTSEND_AI_MODEL"] == "openai_compatible:llama3.3"
+        assert environment["OPENOUTFIND_LLM_API_BASE"] == "http://localhost:11434/v1"
+        assert environment["OUTSEND_LLM_API_BASE"] == "http://localhost:11434/v1"
+        assert environment["OPENOUTFIND_LLM_API_KEY"] == "ollama"
+        assert environment["OUTSEND_LLM_API_KEY"] == "ollama"
+
 
 class TestApplyingIt:
     def test_the_answers_land_in_the_environment(self, configured):

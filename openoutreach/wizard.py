@@ -157,15 +157,35 @@ def _ask_llm(config: SiteConfig) -> None:
     while True:
         config.ai_model = _ask(
             "Model, as provider:model (e.g. anthropic:claude-sonnet-4-5-20250929, "
-            "openai:gpt-4o, groq:llama-3.3-70b)")
-        config.llm_api_key = _ask_secret("API key for that provider")
-        if config.ai_model.startswith("openai_compatible:"):
+            "openai:gpt-4o, groq:llama-3.3-70b, ollama:gemma4:31b)")
+        is_ollama = config.ai_model.startswith("ollama:")
+        is_openai_compat = config.ai_model.startswith("openai_compatible:")
+        config.llm_api_key = _ask_secret(
+            "API key for that provider" + (" (blank if unauthenticated)" if is_ollama else ""),
+            required=not is_ollama,
+        )
+        if is_ollama and not config.llm_api_key:
+            config.llm_api_key = "ollama"
+
+        if is_openai_compat or is_ollama:
+            default_base = "http://localhost:11434/v1" if is_ollama else ""
+            prompt_base = (
+                f"API base URL (e.g. https://your-ollama-cloud-host/v1 or {default_base})"
+                if default_base
+                else "API base URL (OpenRouter / Together / Ollama / vLLM)"
+            )
             config.llm_api_base = _ask(
-                "API base URL (OpenRouter / Together / Ollama / vLLM)")
+                prompt_base,
+                required=not bool(default_base),
+            )
+            if not config.llm_api_base and default_base:
+                config.llm_api_base = default_base
 
         _say("  Verifying…")
-        refused = verify_llm_credentials(
-            config.ai_model, config.llm_api_key, config.llm_api_base)
+        test_model = f"openai_compatible:{config.ai_model[7:]}" if is_ollama else config.ai_model
+        test_key = config.llm_api_key or ("ollama" if is_ollama else "")
+        test_base = config.llm_api_base or ("http://localhost:11434/v1" if is_ollama else "")
+        refused = verify_llm_credentials(test_model, test_key, test_base)
         if refused is None:
             _say("  ✓ the model answered.")
             return
@@ -318,12 +338,12 @@ def _ask(question: str, *, required: bool = True, validate=None) -> str:
         _say(f"  {verdict}")
 
 
-def _ask_secret(question: str) -> str:
+def _ask_secret(question: str, *, required: bool = True) -> str:
     """Ask for a credential without echoing it. Prompt on stderr like every other."""
     while True:
         _say(f"\n{question}")
         answer = getpass.getpass("> ", stream=sys.stderr).strip()
-        if answer:
+        if answer or not required:
             return answer
         _say("  This one is needed.")
 
