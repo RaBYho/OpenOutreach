@@ -224,3 +224,4 @@ class MessageOut(BaseModel):
 
 class RunIn(BaseModel):
     goal: int = Field(default=5, ge=1, le=100)
+
